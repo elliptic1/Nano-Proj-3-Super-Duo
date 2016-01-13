@@ -17,7 +17,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
-import java.net.ProtocolException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -27,13 +26,16 @@ import java.util.Vector;
 
 import barqsoft.footballscores.DatabaseContract;
 import barqsoft.footballscores.R;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /**
  * Created by yehya khaled on 3/2/2015.
  */
 public class MyFetchService extends IntentService
 {
-    public static final String LOG_TAG = "MyFetchService";
+    public static final String TAG = "MyFetchService";
     public MyFetchService()
     {
         super("MyFetchService");
@@ -57,36 +59,36 @@ public class MyFetchService extends IntentService
 
         Uri fetch_build = Uri.parse(BASE_URL).buildUpon().
                 appendQueryParameter(QUERY_TIME_FRAME, timeFrame).build();
-        Log.v(LOG_TAG, "The url we are looking at is: "+fetch_build.toString()); //log spam
+        Log.v(TAG, "The url we are looking at is: "+fetch_build.toString()); //log spam
         HttpURLConnection m_connection = null;
         BufferedReader reader = null;
         String JSON_data = null;
 
         //Opening Connection
         try {
+
             URL fetch = new URL(fetch_build.toString());
             m_connection = (HttpURLConnection) fetch.openConnection();
             m_connection.setRequestMethod("GET");
-            m_connection.addRequestProperty("X-Auth-Token",getString(R.string.api_key));
-            Log.d(LOG_TAG, "trying to connect");
+            m_connection.addRequestProperty("X-Auth-Token", getString(R.string.api_key));
             m_connection.connect();
-            Log.d(LOG_TAG, "done connecting");
+
+            InputStream inputStream;
 
             int code = m_connection.getResponseCode();
             if (code >= 400 && code <= 499) {
-                Log.e(LOG_TAG, "Bad connection code: " + code);
-                return;
+                Log.e(TAG, "Bad connection code: " + code);
+                inputStream = m_connection.getErrorStream();
+            } else {
+                inputStream = m_connection.getInputStream();
             }
-            Log.d(LOG_TAG, "done with if");
-
-
+            Log.d(TAG, "done with getting reader");
 
             // Read the input stream into a String
-            InputStream inputStream = m_connection.getInputStream();
             StringBuffer buffer = new StringBuffer();
             if (inputStream == null) {
                 // Nothing to do.
-                Log.d(LOG_TAG, "inputStream is null");
+                Log.d(TAG, "inputStream is null");
                 return;
             }
             reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -102,12 +104,13 @@ public class MyFetchService extends IntentService
                 // Stream was empty.  No point in parsing.
                 return;
             }
+            Log.d(TAG, "str: " + line + ", " + buffer.toString());
             JSON_data = buffer.toString();
         } catch (MalformedURLException e) {
-            Log.d(LOG_TAG, "Malformed URL");
+            Log.d(TAG, "Malformed URL");
             e.printStackTrace();
         } catch (IOException e) {
-            Log.d(LOG_TAG, "IO Excp: " + e.getMessage());
+            Log.d(TAG, "IO Excp: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if(m_connection != null)
@@ -121,7 +124,7 @@ public class MyFetchService extends IntentService
                 }
                 catch (IOException e)
                 {
-                    Log.e(LOG_TAG,"Error Closing Stream");
+                    Log.e(TAG,"Error Closing Stream");
                 }
             }
         }
@@ -136,16 +139,15 @@ public class MyFetchService extends IntentService
                     return;
                 }
 
-
                 processJSONdata(JSON_data, getApplicationContext(), true);
             } else {
                 //Could not Connect
-                Log.d(LOG_TAG, "Could not connect to server.");
+                Log.d(TAG, "Could not connect to server.");
             }
         }
         catch(Exception e)
         {
-            Log.e(LOG_TAG,e.getMessage());
+            Log.e(TAG,e.getMessage());
         }
     }
     private void processJSONdata (String JSONdata,Context mContext, boolean isReal)
@@ -164,7 +166,6 @@ public class MyFetchService extends IntentService
         final String PRIMERA_LIGA = "402";
         final String Bundesliga3 = "403";
         final String EREDIVISIE = "404";
-
 
         final String SEASON_LINK = "http://api.football-data.org/alpha/soccerseasons/";
         final String MATCH_LINK = "http://api.football-data.org/alpha/fixtures/";
@@ -191,10 +192,8 @@ public class MyFetchService extends IntentService
         String match_id = null;
         String match_day = null;
 
-
         try {
             JSONArray matches = new JSONObject(JSONdata).getJSONArray(FIXTURES);
-
 
             //ContentValues to be inserted
             Vector<ContentValues> values = new Vector <ContentValues> (matches.length());
@@ -245,8 +244,8 @@ public class MyFetchService extends IntentService
                     }
                     catch (Exception e)
                     {
-                        Log.d(LOG_TAG, "error here!");
-                        Log.e(LOG_TAG,e.getMessage());
+                        Log.d(TAG, "error here!");
+                        Log.e(TAG,e.getMessage());
                     }
                     Home = match_data.getString(HOME_TEAM);
                     Away = match_data.getString(AWAY_TEAM);
@@ -265,13 +264,13 @@ public class MyFetchService extends IntentService
                     match_values.put(DatabaseContract.scores_table.MATCH_DAY,match_day);
                     //log spam
 
-                    //Log.v(LOG_TAG,match_id);
-                    //Log.v(LOG_TAG,mDate);
-                    //Log.v(LOG_TAG,mTime);
-                    //Log.v(LOG_TAG,Home);
-                    //Log.v(LOG_TAG,Away);
-                    //Log.v(LOG_TAG,Home_goals);
-                    //Log.v(LOG_TAG,Away_goals);
+                    //Log.v(TAG,match_id);
+                    //Log.v(TAG,mDate);
+                    //Log.v(TAG,mTime);
+                    //Log.v(TAG,Home);
+                    //Log.v(TAG,Away);
+                    //Log.v(TAG,Home_goals);
+                    //Log.v(TAG,Away_goals);
 
                     values.add(match_values);
                 }
@@ -282,11 +281,11 @@ public class MyFetchService extends IntentService
             inserted_data = mContext.getContentResolver().bulkInsert(
                     DatabaseContract.BASE_CONTENT_URI,insert_data);
 
-            //Log.v(LOG_TAG,"Succesfully Inserted : " + String.valueOf(inserted_data));
+            //Log.v(TAG,"Succesfully Inserted : " + String.valueOf(inserted_data));
         }
         catch (JSONException e)
         {
-            Log.e(LOG_TAG,e.getMessage());
+            Log.e(TAG,e.getMessage());
         }
 
     }
