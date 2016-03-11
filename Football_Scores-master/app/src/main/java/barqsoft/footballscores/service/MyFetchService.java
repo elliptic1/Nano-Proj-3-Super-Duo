@@ -35,6 +35,7 @@ import okhttp3.Response;
  */
 public class MyFetchService extends IntentService
 {
+    private long lastWidgetUpdate = 0;
     public static final String TAG = "MyFetchService";
     public MyFetchService()
     {
@@ -130,9 +131,11 @@ public class MyFetchService extends IntentService
         }
         try {
             if (JSON_data != null) {
+                Log.d(TAG, "JSON data not null");
                 //This bit is to check if the data contains any matches. If not, we call processJson on the dummy data
                 JSONArray matches = new JSONObject(JSON_data).getJSONArray("fixtures");
                 if (matches.length() == 0) {
+                    Log.d(TAG, "matches = 0");
                     //if there is no data, call the function on dummy data
                     //this is expected behavior during the off season.
                     processJSONdata(getString(R.string.dummy_data), getApplicationContext(), false);
@@ -152,6 +155,7 @@ public class MyFetchService extends IntentService
     }
     private void processJSONdata (String JSONdata,Context mContext, boolean isReal)
     {
+        Log.d(TAG, "processing JSON data");
         //JSON data
         // This set of league codes is for the 2015/2016 season. In fall of 2016, they will need to
         // be updated. Feel free to use the codes
@@ -166,6 +170,7 @@ public class MyFetchService extends IntentService
         final String PRIMERA_LIGA = "402";
         final String Bundesliga3 = "403";
         final String EREDIVISIE = "404";
+        final String LEAGUE_405 = "405";
 
         final String SEASON_LINK = "http://api.football-data.org/alpha/soccerseasons/";
         final String MATCH_LINK = "http://api.football-data.org/alpha/fixtures/";
@@ -212,6 +217,13 @@ public class MyFetchService extends IntentService
                         League.equals(SERIE_A)             ||
                         League.equals(BUNDESLIGA1)         ||
                         League.equals(BUNDESLIGA2)         ||
+                        League.equals(LIGUE1)         ||
+                        League.equals(LIGUE2)         ||
+                        League.equals(LEAGUE_405)         ||
+                        League.equals(PRIMERA_LIGA)         ||
+                        League.equals(Bundesliga3)         ||
+                        League.equals(EREDIVISIE)         ||
+                        League.equals(SEGUNDA_DIVISION)         ||
                         League.equals(PRIMERA_DIVISION)     )
                 {
                     match_id = match_data.getJSONObject(LINKS).getJSONObject(SELF).
@@ -252,6 +264,18 @@ public class MyFetchService extends IntentService
                     Home_goals = match_data.getJSONObject(RESULT).getString(HOME_GOALS);
                     Away_goals = match_data.getJSONObject(RESULT).getString(AWAY_GOALS);
                     match_day = match_data.getString(MATCH_DAY);
+
+                    // Update widget with the next game
+                    if (i==0 && System.currentTimeMillis() - lastWidgetUpdate > 10*1000) {
+                        lastWidgetUpdate = System.currentTimeMillis();
+                        Intent update_widget_scores_intent = new Intent();
+                        update_widget_scores_intent.setAction("barqsoft.footballscores.update.scores");
+                        update_widget_scores_intent.putExtra("line1", Home + " v. " + Away);
+                        update_widget_scores_intent.putExtra("line2", Home_goals + " -- " + Away_goals);
+                        update_widget_scores_intent.putExtra("line3", match_day);
+                        mContext.sendBroadcast(update_widget_scores_intent);
+                    }
+
                     ContentValues match_values = new ContentValues();
                     match_values.put(DatabaseContract.scores_table.MATCH_ID,match_id);
                     match_values.put(DatabaseContract.scores_table.DATE_COL,mDate);
@@ -281,7 +305,6 @@ public class MyFetchService extends IntentService
             inserted_data = mContext.getContentResolver().bulkInsert(
                     DatabaseContract.BASE_CONTENT_URI,insert_data);
 
-            //Log.v(TAG,"Succesfully Inserted : " + String.valueOf(inserted_data));
         }
         catch (JSONException e)
         {
