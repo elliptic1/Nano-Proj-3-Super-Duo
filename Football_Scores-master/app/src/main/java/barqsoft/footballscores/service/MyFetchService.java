@@ -256,7 +256,6 @@ public class MyFetchService extends IntentService
                     }
                     catch (Exception e)
                     {
-                        Log.d(TAG, "error here!");
                         Log.e(TAG,e.getMessage());
                     }
                     Home = match_data.getString(HOME_TEAM);
