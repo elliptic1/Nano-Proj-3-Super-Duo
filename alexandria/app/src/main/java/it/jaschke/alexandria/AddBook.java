@@ -52,6 +52,18 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         }
     }
 
+    private boolean hasData() {
+        ConnectivityManager connectivityManager = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo wifiNetworkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        if (!wifiNetworkInfo.isConnected()) {
+            NetworkInfo cellNetworkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+            if (!cellNetworkInfo.isConnected()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     @Override
     public View onCreateView(final LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
@@ -80,6 +92,13 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                     clearFields();
                     return;
                 }
+
+                //Once we have an ISBN, check for a data connection a book intent
+                if (!hasData()) {
+                    Toast.makeText(getActivity(), "A data connection is required.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 //Once we have an ISBN, start a book intent
                 Intent bookIntent = new Intent(getActivity(), BookService.class);
                 bookIntent.putExtra(BookService.EAN, ean);
@@ -93,15 +112,9 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             @Override
             public void onClick(View v) {
 
-                ConnectivityManager connectivityManager = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
-
-                NetworkInfo wifiNetworkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-                if (!wifiNetworkInfo.isConnected()) {
-                    NetworkInfo cellNetworkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-                    if (!cellNetworkInfo.isConnected()) {
-                        Toast.makeText(getActivity(), "A data connection is required.", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+                if (!hasData()) {
+                    Toast.makeText(getActivity(), "A data connection is required.", Toast.LENGTH_SHORT).show();
+                    return;
                 }
 
                 if (isPackageInstalled("com.google.zxing.client.android", getActivity())) {
